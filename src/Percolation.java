@@ -1,5 +1,3 @@
-import edu.princeton.cs.algs4.StdRandom;
-import edu.princeton.cs.algs4.StdStats;
 import edu.princeton.cs.algs4.WeightedQuickUnionUF;
 
 /**
@@ -8,7 +6,8 @@ import edu.princeton.cs.algs4.WeightedQuickUnionUF;
 public class Percolation {
     private int count, size;
     private boolean[][] grid;
-    private WeightedQuickUnionUF unidimGrid; // for percolates()
+    private WeightedQuickUnionUF gridPercolates;
+    private WeightedQuickUnionUF gridFull;
 
 
     // create n-by-n grid, with all sites blocked
@@ -20,72 +19,116 @@ public class Percolation {
         grid = new boolean[count][count];
         for (int row = 0; row < count; ++row) {
             for (int col = 0; col < count; ++col) {
-                grid[row][col] = false;
+                grid[row][col] = true;
             }
         }
 
         size = count * count;
-        unidimGrid = new WeightedQuickUnionUF(size + 1);
+        gridPercolates = new WeightedQuickUnionUF(size + 1);
+        gridFull = new WeightedQuickUnionUF(size + 1);
         for (int i = 1; i < count; ++i) {
-            unidimGrid.union(1, i + 1);
-            unidimGrid.union(size, size - i);
+            gridPercolates.union(1, i + 1);
+            gridPercolates.union(size, size - i);
+            gridFull.union(1, i + 1);
         }
 
     }
 
-    // open site (row, col) if it is not open already
+
+    /*
+     *
+     * +-----+-----+-----+-----+-----+
+     * | 1,1 | 1,2 | 1,3 | 1,4 | 1,5 |
+     * |     |     |     |     |     |
+     * +-----+-----+-----+-----+-----+
+     * | 2,1 | 2,2 | 2,3 | 2,4 | 2,5 |
+     * |     |     | up  |     |     |
+     * +-----+-----+-----+-----+-----+
+     * | 3,1 | 3,2 | 3,3 | 3,4 | 3,5 |
+     * |     | lef | r,c | rig |     |
+     * +-----+-----+-----+-----+-----+
+     * | 4,1 | 4,2 | 4,3 | 4,4 | 4,5 |
+     * |     |     | dow |     |     |
+     * +-----+-----+-----+-----+-----+
+     * | 5,1 | 5,2 | 5,3 | 5,4 | 5,5 |
+     * |     |     |     |     |     |
+     * +-----+-----+-----+-----+-----+
+     *
+     * open site (row, col) if it is not open already
+     *
+     */
     public void open(int row, int col) {
-        validArgs(row,col);
+        validateCoords(row, col);
+        if (!isBlocked(row, col))
+            return;
 
-        grid[row-1][col-1] = true;
-        int idx = coord2Index(row, col);
+        unlock(row, col) ;
+        int index = coords2Index(row, col);
+        // Up
+        if (row > 1 && isOpen(row - 1, col)) {
+            gridPercolates.union(coords2Index(row - 1, col), index);
+            gridFull.union(coords2Index(row - 1, col), index);
+        }
 
-        if (row > 1 && isOpen(row-1, col)) {
-            uf.union(coord2Index(row-1, col), idx);
-            ufBack.union(coord2Index(row-1, col), idx);
+        // Down
+        if (row < count && isOpen(row + 1, col)) {
+            gridPercolates.union(coords2Index(row + 1, col), index);
+            gridFull.union(coords2Index(row + 1, col), index);
         }
-        if (row < N && isOpen(row+1, col)) {
-            uf.union(coord2Index(row+1, col), idx);
-            ufBack.union(coord2Index(row+1, col), idx);
+
+        // Left
+        if (col > 1 && isOpen(row, col - 1)) {
+            gridPercolates.union(coords2Index(row, col - 1), index);
+            gridFull.union(coords2Index(row, col - 1), index);
         }
-        if (col > 1 && isOpen(row, col-1)) {
-            uf.union(coord2Index(row, col-1), idx);
-            ufBack.union(coord2Index(row, col-1), idx);
-        }
-        if (col < N && isOpen(row, col+1)) {
-            uf.union(coord2Index(row, col+1), idx);
-            ufBack.union(coord2Index(row, col+1), idx);
+
+        // Right
+        if (col < count && isOpen(row, col + 1)) {
+            gridPercolates.union(coords2Index(row, col + 1), index);
+            gridFull.union(coords2Index(row, col + 1), index);
         }
     }
 
     // is site (row, col) open?
     public boolean isOpen(int row, int col) {
-        return true;
+        validateCoords(row, col);
+        return !isBlocked(row, col);
     }
 
     // is site (row, col) full?
     public boolean isFull(int row, int col) {
-        return true;
+        return isOpen(row, col) && gridFull.connected(1, coords2Index(row, col));
     }
 
     // does the system percolate?
     public boolean percolates() {
-        return true;
+        // If case n-by-n = 1
+        if (count == 1)
+            return isOpen(1,1);
+        return gridPercolates.connected(1, size);
     }
 
-    private int coord2Index(int row, int col) {
+    private boolean isBlocked(int row, int col) {
+        return grid[row-1][col-1];
+    }
+
+    private void unlock(int row, int col) {
+         grid[row-1][col-1] = false;
+    }
+
+    private int coords2Index(int row, int col) {
         return (row - 1) * count + col;
     }
 
-    private void validCoordinates(int i, int j) {
-        if (i < 1 || i > count || j < 1 || j > count)
-            throw new java.lang.IndexOutOfBoundsException();
+    private void validateCoords(int row, int col) {
+        validate(row);
+        validate(col);
     }
 
     // validate that p is a valid index
     private void validate(int p) {
-        if (p < 0 || p >= count) {
-            throw new IndexOutOfBoundsException("ndex " + p + " is not between 1 and " + (n-1));
+        if (p < 1 || p > count) {
+            throw new IndexOutOfBoundsException("Index " + p + " is not between 1 and " + count);
         }
     }
 
